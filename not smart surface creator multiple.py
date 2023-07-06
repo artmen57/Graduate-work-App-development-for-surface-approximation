@@ -1,4 +1,5 @@
 from math import atan2, pi
+import open3d as o3d
 from itertools import groupby
 from scipy.spatial import ConvexHull
 from geomdl import BSpline, utilities, exchange, multi
@@ -6,7 +7,8 @@ from geomdl.visualization import VisVTK as vis
 import numpy as np 
 #dorsal1.pts - concave   dorsal1.pts - coonvex
 #f1=["dorsal1.pts","dorsal2.pts","dorsal3.pts","dorsal4.pts","dorsal5.pts","dorsal6.pts","dorsal7.pts","dorsal8.pts","dorsal9.pts","dorsal10.pts"]
-f1=["dorsal1.pts","dorsal2.pts"]
+#f1=["dorsal2.pts"]
+f1=["flash2.pts"]
 
 f_root="examples/"
 
@@ -27,13 +29,22 @@ def plotter(point_cloud):
     fig.show(autosize=False,width=800, height=400,poi=2)
 def surface_gen(val2,new_list1):
     surf = BSpline.Surface()
-    u=len(new_list1)
-    v=len(new_list1[-1])
     surf.degree_u = 1
-    surf.degree_v = 2
+    surf.degree_v = 1
     #make 3d list for two_dimentional option
     #exchange.import_txt(new_list, two_dimensional=True)
-    surf.set_ctrlpts(val2,u,v)
+    if f1[0]=="flash2.pts":
+        u=5
+        v=4
+        surf.ctrlpts_size_u=u
+        surf.ctrlpts_size_v=v
+        surf.ctrlpts=val2
+    else:
+        u=len(new_list1)
+        v=len(new_list1[-1])
+        surf.degree_u = 2
+        surf.degree_v = 2
+        surf.set_ctrlpts(val2,u,v)
     surf.knotvector_u = utilities.generate_knot_vector(surf.degree_u, surf.ctrlpts_size_u)
     surf.knotvector_v = utilities.generate_knot_vector(surf.degree_v, surf.ctrlpts_size_v)
     surf.delta = 0.025
@@ -42,7 +53,7 @@ def surface_gen(val2,new_list1):
     # Evaluate surface
     surf.evaluate()
     return surf
-def surf_approx():
+
     pass
 def renderer(surf):
     vis_comp = vis.VisSurface()
@@ -98,7 +109,7 @@ def reader (f:str):
     if f=="dorsal1.pts" or f=="dorsal2.pts" or f=="dorsal7.pts"or f=="dorsal9.pts":
         new_list_[len(new_list_)//2:],new_list_[:len(new_list_)//2] = new_list_[:len(new_list_)//2],new_list_[len(new_list_)//2:]
         ready_list=[elem for row in new_list_ for elem in row]
-    elif f=="dorsal3.pts" or f=="dorsal4.pts" or f=="dorsal5.pts" or f=="dorsal11.pts" or f=="dorsal12.pts":
+    elif f=="dorsal3.pts" or f=="dorsal4.pts" or f=="dorsal5.pts" or f=="dorsal11.pts":
         new_list4=new_list_[len(new_list_)//2:]
         new_list4[0], new_list4[1] = new_list4[1], new_list4[0]
         nl444=[i[::-1] for i in new_list4[::-1]]
@@ -107,19 +118,45 @@ def reader (f:str):
         new_list_=new_list44.tolist() 
         ready_list=[elem for row in new_list_ for elem in row]
     return ready_list,new_list_,
-""" 
-for i in f1:
-    f2=f_root+i
-    f3.append(f2) """
+arr_high=[]
+arr_draft=[]
 for j in f1:
     print(j)
     arr,tabl=reader(j)
+    if j=="flash2.pts":
+        pcd=o3d.geometry.PointCloud()
+        pcd.points=o3d.utility.Vector3dVector(arr)
+        downpcd = pcd.voxel_down_sample(voxel_size=0.05)
+        arr=np.asarray(downpcd.points)
+        arr=arr.tolist()
+        arr=[[np.round(float(i), 4) for i in nested] for nested in arr]
+        plotter(arr)
+        arr=sorted(arr)
+        print("\n")
+        # избавился от других сторон
+        for i in arr:
+            if i[2]>=0.01:
+                arr_high.append(i)
+        plotter(arr_high)
+        # сортировка по y последовательно при x в одной группе
+        for i_1 in arr_high:
+            for i_2 in arr_high[:-1]:
+                    if abs(i_1[0])-abs(i_2[0])<=0.02:
+                        continue
+                    print(i_1,i_2)
+                                       
+
+        for i in range(len(arr_high)):
+            print(arr_high[i])
+        arr=arr_high
     vals.append(arr)
     tables.append(tabl)
+
+
 for arr_ready,tabl_ready in zip(vals,tables):
     obj=surface_gen(arr_ready,tabl_ready)
     obj_mult.append(obj)
-    renderer(obj)
+    renderer(obj) 
 sum = multi.SurfaceContainer(obj_mult)
 sum.sample_size = 50
 
@@ -127,7 +164,7 @@ sum.sample_size = 50
 sum.vis = vis.VisSurface(ctrlpts=True, legend=False, figure_size=[1280, 720])
 #sum.vis = VisVTK.VisSurface(ctrlpts=True, legend=False, figure_size=[940, 940])
 
-sum.render(cpcolor="gray")
+#sum.render(cpcolor="gray")
 exchange.export_obj(sum,"layers.obj")
 
 
